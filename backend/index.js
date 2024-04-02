@@ -31,13 +31,17 @@ const UserSchema = new mongoose.Schema({
         type: String,
         required: true,
     },
-    date: {
-        type: Date,
-        default: Date.now
-    }
+    registerAdmin: {
+        type: Boolean,
+        required: true,
+    },
 });
 
 const messageSchema = new mongoose.Schema({
+    uuid: {
+        type: String,
+        required: true
+    },
     user: {
         type: String,
         required: true
@@ -46,11 +50,16 @@ const messageSchema = new mongoose.Schema({
         type: String,
         required: true
     },
+    pollOptions: {
+        type: Object,
+        required: false
+    },
     timestamp: {
         type: Date,
         default: Date.now
-    }
+    },
 });
+
 
 const User = mongoose.model('User', UserSchema);
 const Message = mongoose.model('Message', messageSchema);
@@ -61,14 +70,13 @@ app.get('/', (req, res) => {
 
 app.post('/register', async (req, res) => {
     try {
-        const { name, password } = req.body;
 
+        const { name, password, registerAdmin } = req.body;
         const existingUserByName = await User.findOne({ name: name });
         if (existingUserByName) {
             return res.status(400).json({ message: 'This username is already taken. Please choose a different one.' });
         }
-
-        const user = new User({ name, password });
+        const user = new User({ name, password, registerAdmin });
         const result = await user.save();
         res.json(result);
     } catch (error) {
@@ -83,7 +91,7 @@ app.post('/login', async (req, res) => {
         const { name, password } = req.body;
         const user = await User.findOne({ name, password });
         if (user) {
-            res.json({ success: true });
+            res.json({ success: true, user: user });
         } else {
             res.json({ success: false });
         }
@@ -92,17 +100,27 @@ app.post('/login', async (req, res) => {
     }
 });
 
+
 app.post('/sendMessage', async (req, res) => {
     try {
-        const { user, text } = req.body;
-        const message = new Message({ user, text });
+        const { uuid, user, text, pollOptions } = req.body;
+        
+        // Ensure pollOptions is provided and is an object
+        const messageData = pollOptions ? { uuid, user, text, pollOptions } : { uuid, user, text };
+        
+        const message = new Message(messageData);
+        
+        console.log(message);
+        
         await message.save();
+        
         res.status(201).json({ success: true });
     } catch (error) {
         console.error('Error saving message:', error);
         res.status(500).json({ message: 'Error saving message' });
     }
 });
+
 
 app.get('/fetchMessages', async (req, res) => {
     try {
@@ -125,6 +143,31 @@ app.get('/clearMessages', async (req, res) => {
         res.status(500).json({ success: false, message: 'Error clearing messages' });
     }
 });
+
+app.put('/vote/:uuid/:voteIndex', async (req, res) => {
+    const { uuid, voteIndex } = req.params;
+
+    try {
+        const message = await Message.findOne({ uuid: uuid });
+
+        if (!message) {
+            return res.status(404).send({ error: 'Message not found' });
+        }
+
+        if (message.pollOptions.hasOwnProperty(voteIndex)) {
+            message.pollOptions[voteIndex].votes += 1;
+            message.markModified('pollOptions');
+            await message.save();
+            res.send({ success: true, message: 'Vote registered' });
+        } else {
+            res.status(400).send({ error: 'Invalid poll option index' });
+        }
+    } catch (error) {
+        console.error('Error updating vote:', error);
+        res.status(500).send({ error: 'Internal Server Error' });
+    }
+});
+
 
 
 const PORT = process.env.PORT || 5000;
