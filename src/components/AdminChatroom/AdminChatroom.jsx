@@ -32,7 +32,7 @@ function AdminChatroom({ user, isLoggedIn }) {
                         }, {})
                     : {}
                     return {
-                        uuid, uuid,
+                        uuid: uuid,
                         username: user,
                         message: text,
                         pollOptions: poll
@@ -42,9 +42,24 @@ function AdminChatroom({ user, isLoggedIn }) {
                 const ablyKey = 'gWdAvw.DxcdmQ:WYmbfWlXmbZBC5UeOKWXretPGWjPUCb_F-_x9-JpME4'
                 const client = new Ably.Realtime.Promise({ key: ablyKey });
                 const chatChannel = client.channels.get('chat');
-                chatChannel.subscribe((message) => {
-                    setMessages(prevMessages => [...prevMessages, message.data]);
+                chatChannel.subscribe((message) => {   
+                    setMessages(prevMessages => {
+                        const index = prevMessages.findIndex(msg => msg.uuid === message.data.uuid);
+                        if (index !== -1) {
+                            // Replace the existing message with the same UUID
+                            const updatedMessages = [...prevMessages];
+                            updatedMessages[index] = message.data;
+                            console.log("replace")
+                            return updatedMessages;
+                        } else {
+                            // Add the new message
+                            console.log("new")
+                            console.log(message)
+                            return [...prevMessages, message.data];
+                        }
+                    });
                 });
+                
                 setAblyClient(client);
                 setChannel(chatChannel);
             
@@ -53,7 +68,7 @@ function AdminChatroom({ user, isLoggedIn }) {
             }
         }
     };
-
+    
     useEffect(() => {
         if (isLoggedIn && !ablyClient) {
             initializeChat();
@@ -105,7 +120,7 @@ function AdminChatroom({ user, isLoggedIn }) {
             }
         }));
     };
-
+    console.log(messages)
     const handleVote = (uuid, voteIndex) => {
         // Construct the URL for the API endpoint
         const apiUrl = `http://localhost:5000/vote/${uuid}/${voteIndex}`;
@@ -118,18 +133,9 @@ function AdminChatroom({ user, isLoggedIn }) {
             if (!response.ok) {
                 throw new Error('Failed to vote');
             }
-            console.log('Vote successful');
-            console.log(response)
-            // channel.publish({
-            //     name: '',
-            //     data: response,
-            //     extras: {
-            //       ref: {
-            //         type: "vote-change",
-            //         uuid: uuid,
-            //       }
-            //     }
-            //   })
+            const test = {uuid: 'e3294d2f-7201-4164-aaa1-402f269547e2', username: 'admin5', message: 'test', pollOptions: {0: {answer: '1', votes: 12}, 1: {answer: '2', votes: 69}, 2: {answer: '3', votes: 0}}}
+            channel.publish("vote", test);
+              
         })
         .catch(error => {
             console.error('Error voting:', error);

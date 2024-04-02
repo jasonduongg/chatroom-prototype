@@ -51,7 +51,6 @@ function App() {
         result = await result.json();
         if (result.success) {
             const { name, password, registerAdmin } = result.user;
-            console.log(name)
             setUser({ name, password, registerAdmin });
             setIsLoggedIn(true);
         } else {
